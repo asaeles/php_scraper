@@ -1,26 +1,27 @@
 <?php
 	
 	
-	function scrape($url, $level, $out_file, $domain = "", $max_level = 0, $max_retries = 3, $use_cache = true) {
+	function scrape($url, $level, $out_file, $max_level = 0, $domain = "", $max_retries = 3, $use_cache = true) {
 		// Stop at a certain depth defined by Maximum Level
 		// Root page is level 0
 		if ($max_level > 0 && $level > $max_level) {
 			return false;
 		}
 		
-		echo "Scraping: $url\n";
+		echo "\nScraping: $url\n";
 		
 		// Empty the output file at root page and get domain name
-		if ($level = 0) {
+		if ($level == 0) {
 			file_put_contents($out_file, "");
 			$ret = preg_match('!https?://[^/\?]+!i', $url, $arr);
-			$domain =  $arr[1];
+			$domain =  $arr[0];
+			echo "Domain: $domain\n";
 		}
 		
 		// Caching web pages in folder "cache" if Use Cahce is set to true
 		$cached = false;
 		if ($use_cache) {
-			mkdir("cache", 0777);
+			@mkdir("cache", 0777);
 			$cache = "cache/" . md5($url);
 			if (file_exists($cache)) {
 				echo "Fetching from: $cache\n";
@@ -32,7 +33,7 @@
 				$html = false;
 				while ($html === false && $retry < $max_retries) {
 					$retry++;
-					$html = file_get_contents($url);
+					$html = @file_get_contents($url);
 				}
 				if ($html === false) {
 					echo "Error reading: $url\n";
@@ -46,6 +47,7 @@
 		//  to scrape is the title
 		$ret = preg_match('|<title>([^<]+)</title>|i', $html, $arr);
 		$title =  $arr[1];
+		echo "Title: $title\n";
 		
 		// --------- Data scraping ---------
 		//Assuming there is no data to scrape in first page
@@ -64,17 +66,23 @@
 				$line .= ",\"{$arr[3][$key]}\"";
 				$line .= ",{$arr[2][$key]}";
 				$line .= ",{$arr[4][$key]}\n";
+				$line .= "\n";
 				file_put_contents($out_file, $line, FILE_APPEND);
 			}
 		}
 		
 		// --------- Links crawling ---------
 		$ret = preg_match_all('!Here goes the regexp for crawling links!imsU', $html, $arr);
+		if ($ret === false || $ret == 0) {
+			return true;
+		}
 		// Usualy links need prefixing the domain name to it
+		array_walk($arr[1], 'dec');
 		array_walk($arr[1], 'pfx', $domain);
 		foreach ($arr[1] as $key => $sub_url) {
-			scrape($sub_url, $level + 1, $out_file, $max_level, $max_retries, $use_cache);
+			scrape($sub_url, $level + 1, $out_file, $max_level, $domain, $max_retries, $use_cache);
 		}
+		return true;
 	}
 	
 	function pfx(&$val, $key, $prefix)
@@ -87,5 +95,10 @@
 		$val = "$val$suffix";
 	}
 
-	scrape("https://www.amazon.com/Best-Sellers/zgbs", 0, "output.csv");
+	function dec(&$val, $key)
+	{
+		$val = htmlspecialchars_decode($val);
+	}
+
+	scrape("https://www.google.com/search?dcr=0&source=hp&ei=ekEYWpaFJsT6aoOSsbgH&q=test&oq=test&gs_l=psy-ab.3..0i131k1j0l9.14705.15606.0.17002.4.4.0.0.0.0.154.548.0j4.4.0....0...1c.1.64.psy-ab..0.4.546....0.9ZBlevzcbOA", 0, "output.csv", 20);
 ?>
