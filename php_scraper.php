@@ -1,7 +1,28 @@
 <?php
-	
-	
-	function scrape($url, $level, $out_file, $max_level = 0, $domain = "", $max_retries = 3, $use_cache = true) {
+	/**
+	* The main function that does the job
+	*
+	* The function crawls the URL for links and then scrapes data
+	*  from pages of these links and exports the data to CSV file
+	*
+	* @param string $url Starting URL
+	* @param string $crawl_regex Regular expression that will be used
+	*    for link crawling
+	* @param string $scrape_regex Regular expression that will be used
+	*    for data scraping
+	* @param integer $level Used for recursion, use 0 when calling function
+	* @param string $out_file Name of CSV file to export to
+	* @param integer $max_level Maximum levels or depth to crawl into
+	* @param string $domain (Optional) Used for recursion, use ""
+	*    when calling function
+	* @param integer $max_retries (Optional) Number of HTTP retries
+	*    when timeouts or errors occur (default 3)
+	* @param boolean $use_cache (Optional) True to cache web pages
+	*    for fast extraction after re-running the script
+	*
+	* @return boolean Tue if successful, false if otherwise
+	*/
+	function scrape($url, $crawl_regex, $scrape_regex, $level, $out_file, $max_level = 0, $domain = "", $max_retries = 3, $use_cache = true) {
 		// Stop at a certain depth defined by Maximum Level
 		// Root page is level 0
 		if ($max_level > 0 && $level > $max_level) {
@@ -18,7 +39,7 @@
 			echo "Domain: $domain\n";
 		}
 		
-		// Caching web pages in folder "cache" if Use Cahce is set to true
+		// Caching web pages in folder "cache" if Use Cache is set to true
 		$cached = false;
 		if ($use_cache) {
 			@mkdir("cache", 0777);
@@ -52,8 +73,8 @@
 		// --------- Data scraping ---------
 		//Assuming there is no data to scrape in first page
 		if ($level != 0) {
-			$ret = preg_match_all('!Here goes the regexp for scraping data!imsU', $html, $arr);
-			// Usualy links need prefixing the domain name to it
+			$ret = preg_match_all("!$scrape_regex!imsU", $html, $arr);
+			// Usually links need prefixing the domain name to it
 			array_walk($arr[2], 'pfx', $domain);
 			array_walk($arr[4], 'sfx', '.jpg');
 			foreach ($arr[1] as $key => $val) {
@@ -72,15 +93,16 @@
 		}
 		
 		// --------- Links crawling ---------
-		$ret = preg_match_all('!Here goes the regexp for crawling links!imsU', $html, $arr);
+		$ret = preg_match_all("!$crawl_regex!imsU", $html, $arr);
 		if ($ret === false || $ret == 0) {
 			return true;
 		}
-		// Usualy links need prefixing the domain name to it
+		// Usually links need prefixing the domain name to it
 		array_walk($arr[1], 'dec');
 		array_walk($arr[1], 'pfx', $domain);
 		foreach ($arr[1] as $key => $sub_url) {
-			scrape($sub_url, $level + 1, $out_file, $max_level, $domain, $max_retries, $use_cache);
+			scrape($sub_url, $crawl_regex, $scrape_regex, $level + 1,
+			$out_file, $max_level, $domain, $max_retries, $use_cache);
 		}
 		return true;
 	}
@@ -99,6 +121,4 @@
 	{
 		$val = htmlspecialchars_decode($val);
 	}
-
-	scrape("https://www.google.com/search?dcr=0&source=hp&ei=ekEYWpaFJsT6aoOSsbgH&q=test&oq=test&gs_l=psy-ab.3..0i131k1j0l9.14705.15606.0.17002.4.4.0.0.0.0.154.548.0j4.4.0....0...1c.1.64.psy-ab..0.4.546....0.9ZBlevzcbOA", 0, "output.csv", 20);
 ?>
